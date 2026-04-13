@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState } from 'react'
 import { useCart } from '@/components/cart/cart-provider'
 import { ShopDropdown } from './shop-dropdown'
@@ -11,9 +12,16 @@ export function Navbar() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 bg-void/90 backdrop-blur-xl border-b border-white/[0.06]">
-      <nav className="max-w-7xl mx-auto flex items-center justify-between px-6 py-5">
-        <Link href="/store" className="font-display text-base tracking-[5px] uppercase text-bone">
-          Cult of Elysium
+      <nav className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
+        <Link href="/store" className="relative h-12 w-56 shrink-0">
+          <Image
+            src="/logo.webp"
+            alt="Cult of Elysium"
+            fill
+            className="object-contain object-left"
+            sizes="224px"
+            priority
+          />
         </Link>
         <ul className="flex gap-10 list-none">
           <li className="relative">
