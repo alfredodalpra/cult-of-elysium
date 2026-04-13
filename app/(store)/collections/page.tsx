@@ -4,7 +4,7 @@ import { CollectionRow } from '@/components/store/collection-row'
 export const revalidate = 300
 
 export default async function CollectionsPage() {
-  const collections = await getCollections()
+  const collections = await getCollections().catch(() => [])
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12">

@@ -6,8 +6,8 @@ export const revalidate = 300
 
 export default async function StorePage() {
   const [products, collections] = await Promise.all([
-    getProducts(12),
-    getCollections(),
+    getProducts(12).catch(() => []),
+    getCollections().catch(() => []),
   ])
 
   return (

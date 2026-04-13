@@ -3,7 +3,7 @@ import { ProductGrid } from '@/components/store/product-grid'
 
 export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams
-  const products = q ? await searchProducts(q) : []
+  const products = q ? await searchProducts(q).catch(() => []) : []
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12">
