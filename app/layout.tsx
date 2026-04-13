@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { marcellus, outfit } from '@/lib/fonts'
+import { CartProvider } from '@/components/cart/cart-provider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -11,7 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${marcellus.variable} ${outfit.variable}`}>
       <body className="antialiased">
-        {children}
+        <CartProvider>{children}</CartProvider>
       </body>
     </html>
   )
