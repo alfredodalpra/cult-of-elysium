@@ -1,5 +1,8 @@
 import { shopifyFetch } from './client'
+import { mockProducts, mockCollections } from './mock-data'
 import type { Product, Collection } from './types'
+
+const isMock = !process.env.SHOPIFY_STORE_DOMAIN || process.env.SHOPIFY_STORE_DOMAIN === 'your-store.myshopify.com'
 
 const PRODUCT_FRAGMENT = `
   fragment ProductFields on Product {
@@ -46,6 +49,8 @@ const PRODUCT_FRAGMENT = `
 `
 
 export async function getProducts(first = 20): Promise<Product[]> {
+  if (isMock) return mockProducts.slice(0, first)
+
   const data = await shopifyFetch<{ products: { nodes: Product[] } }>({
     query: `
       query GetProducts($first: Int!) {
@@ -62,6 +67,8 @@ export async function getProducts(first = 20): Promise<Product[]> {
 }
 
 export async function getProduct(handle: string): Promise<Product | null> {
+  if (isMock) return mockProducts.find(p => p.handle === handle) ?? null
+
   const data = await shopifyFetch<{ product: Product | null }>({
     query: `
       query GetProduct($handle: String!) {
@@ -76,6 +83,8 @@ export async function getProduct(handle: string): Promise<Product | null> {
 }
 
 export async function getCollections(): Promise<Collection[]> {
+  if (isMock) return mockCollections
+
   const data = await shopifyFetch<{ collections: { nodes: Collection[] } }>({
     query: `
       query GetCollections {
@@ -96,6 +105,8 @@ export async function getCollections(): Promise<Collection[]> {
 }
 
 export async function getCollection(handle: string): Promise<Collection | null> {
+  if (isMock) return mockCollections.find(c => c.handle === handle) ?? null
+
   const data = await shopifyFetch<{ collection: Collection | null }>({
     query: `
       query GetCollection($handle: String!) {
@@ -119,6 +130,11 @@ export async function getCollection(handle: string): Promise<Collection | null> 
 }
 
 export async function searchProducts(query: string): Promise<Product[]> {
+  if (isMock) {
+    const q = query.toLowerCase()
+    return mockProducts.filter(p => p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q))
+  }
+
   const data = await shopifyFetch<{ search: { nodes: Product[] } }>({
     query: `
       query Search($query: String!) {
