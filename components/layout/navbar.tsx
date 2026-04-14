@@ -14,7 +14,7 @@ export function Navbar() {
     <header className="fixed top-0 left-0 right-0 z-40 bg-void/90 backdrop-blur-xl border-b border-white/[0.06]">
       <nav className="max-w-7xl mx-auto relative flex items-center justify-between px-6 py-4">
         {/* Logo — left */}
-        <Link href="/store" className="relative h-14 w-60 shrink-0">
+        <Link href="/store" className="relative h-12 w-56 shrink-0">
           <Image
             src="/logo.webp"
             alt="Cult of Elysium"
