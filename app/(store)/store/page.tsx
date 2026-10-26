@@ -1,8 +1,14 @@
+import type { Metadata } from 'next'
 import { getProducts, getCollections } from '@/lib/shopify/queries'
 import { ProductGrid } from '@/components/store/product-grid'
 import { CollectionRow } from '@/components/store/collection-row'
 
 export const revalidate = 300
+
+export const metadata: Metadata = {
+  title: 'Store',
+  description: 'Browse sacred offerings: bracelets, necklaces, rings and earrings with a gothic, celestial soul.',
+}
 
 export default async function StorePage() {
   const [products, collections] = await Promise.all([

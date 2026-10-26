@@ -1,5 +1,7 @@
 # Cult of Elysium
 
+[![CI](https://github.com/alfredodalpra/cult-of-elysium/actions/workflows/ci.yml/badge.svg)](https://github.com/alfredodalpra/cult-of-elysium/actions/workflows/ci.yml)
+
 A headless e-commerce storefront for a gothic jewelry brand, built with **Next.js 16 (App Router)**, **React 19** and the **Shopify Storefront API**.
 
 **[Live demo →](https://cult-of-elysium.vercel.app)** · runs in demo mode on mock data
@@ -17,6 +19,8 @@ A headless e-commerce storefront for a gothic jewelry brand, built with **Next.j
 - **Demo mode:** without Shopify credentials, the whole store (including the cart) runs on built-in mock data. You can clone and run it, or deploy it, with zero configuration.
 - **Caching and revalidation:** catalog pages use ISR (`revalidate = 300`) and tag their fetches (`products`, `collections`). A Shopify webhook hits `/api/revalidate` to refresh them instantly, after verifying Shopify's HMAC-SHA256 signature with a constant-time comparison.
 - **Generated product photography:** the demo catalogue's photos were generated with Gemini (`gemini-3-pro-image`) by [`scripts/generate-product-images.mjs`](scripts/generate-product-images.mjs). Colour variants and close-ups pass the main shot back as a reference image so each product's photos match.
+- **Responsive and accessible:** a dedicated mobile menu, 32px touch targets, alt text on every product image, and per-page titles, descriptions and share images (Open Graph).
+- **End-to-end tested:** a Playwright suite covers the cart flow, navigation (every menu link must resolve), search, metadata and layout (no overlapping navbar items at four widths, no horizontal scrolling). It runs on desktop and Pixel 7 profiles in GitHub Actions on every push.
 - **Custom visuals:** the homepage hero is a hand-written `<canvas>` animation (painted nebula, drifting orbs, twinkling stars), with Framer Motion for page and cart-drawer transitions.
 
 ## Tech stack
@@ -28,6 +32,7 @@ A headless e-commerce storefront for a gothic jewelry brand, built with **Next.j
 | Styling | Tailwind CSS 4, custom design tokens, `next/font` (Marcellus, Outfit) |
 | Animation | Framer Motion, Canvas 2D |
 | Commerce | Shopify Storefront API (GraphQL), Cart API |
+| Testing | Playwright, GitHub Actions |
 
 ## Architecture
 
@@ -39,7 +44,9 @@ app/
 components/
   cart/                 CartProvider (client state) + drawer UI
   hero/                 Canvas animation + overlay
+  layout/               Navbar (desktop links + mobile menu), footer
   product/ store/ ui/   Presentational components
+e2e/                    Playwright specs (cart, navigation, pages)
 lib/shopify/
   client.ts             Typed GraphQL fetch with cache tags
   queries.ts            Catalog reads (mock fallback in demo mode)
@@ -80,6 +87,7 @@ To get instant catalog updates, create Shopify webhooks for product and collecti
 | `npm run build` | Production build |
 | `npm run start` | Serve the production build |
 | `npm run lint` | ESLint |
+| `npm run test:e2e` | Playwright end-to-end tests (run `npm run build` first) |
 | `node scripts/generate-product-images.mjs` | Regenerate demo product photos (needs `GEMINI_API_KEY` in `.env.local`) |
 
 ## Deploying

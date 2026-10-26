@@ -14,7 +14,7 @@ export function CartLineItem({ item }: { item: CartItem }) {
     <div className="flex gap-4">
       {image && (
         <div className="w-20 h-24 relative rounded overflow-hidden bg-crypt flex-shrink-0">
-          <Image src={image.url} alt={image.altText ?? ''} fill className="object-cover" sizes="80px" />
+          <Image src={image.url} alt={image.altText ?? item.merchandise.product.title} fill className="object-cover" sizes="80px" />
         </div>
       )}
       <div className="flex-1 min-w-0">

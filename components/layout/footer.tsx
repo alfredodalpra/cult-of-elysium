@@ -12,6 +12,7 @@ export function Footer() {
             { label: 'Shop', href: '/store' },
             { label: 'Collections', href: '/collections' },
             { label: 'About', href: '/about' },
+            { label: 'Search', href: '/search' },
           ].map(({ label, href }) => (
             <Link
               key={href}

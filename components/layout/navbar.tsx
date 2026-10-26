@@ -25,7 +25,7 @@ export function Navbar({ collections }: { collections: { handle: string; title: 
     <header className="fixed top-0 left-0 right-0 z-40 bg-void/90 backdrop-blur-xl border-b border-white/[0.06]">
       <nav className="max-w-7xl mx-auto relative flex items-center justify-between px-6 py-4">
         {/* Logo — left */}
-        <Link href="/store" className="relative h-10 w-40 md:h-12 md:w-56 shrink-0">
+        <Link href="/store" className="relative h-10 w-40 lg:h-12 lg:w-56 shrink-0">
           <Image
             src="/logo.webp"
             alt="Cult of Elysium"
@@ -37,7 +37,7 @@ export function Navbar({ collections }: { collections: { handle: string; title: 
         </Link>
 
         {/* Nav links — absolutely centered, desktop only */}
-        <ul className="hidden md:flex absolute left-1/2 -translate-x-1/2 gap-10 list-none">
+        <ul className="hidden md:flex absolute left-1/2 -translate-x-1/2 gap-6 lg:gap-10 list-none">
           <li className="relative">
             <button
               data-shop-toggle
@@ -51,6 +51,7 @@ export function Navbar({ collections }: { collections: { handle: string; title: 
           </li>
           <li><Link href="/collections" className={linkClass}>Collections</Link></li>
           <li><Link href="/about" className={linkClass}>About</Link></li>
+          <li><Link href="/search" className={linkClass}>Search</Link></li>
         </ul>
 
         {/* Cart — right, plus the menu toggle on mobile */}
@@ -81,6 +82,7 @@ export function Navbar({ collections }: { collections: { handle: string; title: 
           <div className="border-t border-white/[0.06] mt-3 pt-3">
             <Link href="/collections" onClick={closeMenu} className={`block py-3 ${linkClass}`}>Collections</Link>
             <Link href="/about" onClick={closeMenu} className={`block py-3 ${linkClass}`}>About</Link>
+            <Link href="/search" onClick={closeMenu} className={`block py-3 ${linkClass}`}>Search</Link>
           </div>
         </div>
       )}
