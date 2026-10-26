@@ -2,7 +2,7 @@
 
 A headless e-commerce storefront for a gothic jewelry brand, built with **Next.js 16 (App Router)**, **React 19** and the **Shopify Storefront API**.
 
-<!-- Add your deployed URL here once it's live, e.g.: **[Live demo →](https://cult-of-elysium.vercel.app)** -->
+**[Live demo →](https://cult-of-elysium.vercel.app)** · runs in demo mode on mock data
 
 ![Homepage hero with a painted nebula and star field](docs/screenshots/home.png)
 
