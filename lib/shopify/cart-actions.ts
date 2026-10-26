@@ -29,6 +29,17 @@ export type CartResult = {
 }
 
 const EXPIRED_MESSAGE = 'Your cart expired, so it has been cleared. Please add your items again.'
+const INVALID_MESSAGE = 'That cart update is not valid.'
+const MAX_QUANTITY = 99
+
+// Server Actions are public endpoints, so their arguments are untrusted input.
+function isQuantity(value: unknown, min: number): value is number {
+  return Number.isInteger(value) && (value as number) >= min && (value as number) <= MAX_QUANTITY
+}
+
+function isId(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 200
+}
 
 const CART_COOKIE = 'cartId'
 const MOCK_CART_COOKIE = 'mockCart'
@@ -65,6 +76,7 @@ export async function getCart(): Promise<Cart | null> {
 }
 
 export async function addToCart(variantId: string, quantity = 1): Promise<CartResult> {
+  if (!isId(variantId) || !isQuantity(quantity, 1)) return { error: INVALID_MESSAGE }
   if (isMock) return { cart: await writeMockLines(addMockLine(await readMockLines(), variantId, quantity)) }
 
   const cookieStore = await cookies()
@@ -76,20 +88,23 @@ export async function addToCart(variantId: string, quantity = 1): Promise<CartRe
         return { cart: await shopify.addToCart(cartId, variantId, quantity) }
       } catch (err) {
         if (!(err instanceof CartNotFoundError)) throw err
-        // The stored cart expired or was checked out: fall through and start a new one.
+        // Shopify returned no cart. If the cart still exists it rejected the item instead.
+        if (await shopify.getCart(cartId)) return { error: err.message }
+        // Otherwise the stored cart expired or was checked out: start a new one below.
       }
     }
 
-    const cart = await shopify.createCart()
+    // Only point the cookie at the new cart once it exists with the item in it.
+    const cart = await shopify.createCart(variantId, quantity)
     cookieStore.set(CART_COOKIE, cart.id, cookieOptions)
-    return { cart: await shopify.addToCart(cart.id, variantId, quantity) }
+    return { cart }
   } catch (err) {
-    if (err instanceof CartUserError) return { error: err.message }
+    if (err instanceof CartUserError || err instanceof CartNotFoundError) return { error: err.message }
     throw err
   }
 }
 
-// Runs a change against the stored cart, clearing it if Shopify no longer knows it.
+// Runs a change against the stored cart, clearing it only if Shopify no longer knows it.
 async function changeExistingCart(change: (cartId: string) => Promise<Cart>): Promise<CartResult> {
   const cookieStore = await cookies()
   const cartId = cookieStore.get(CART_COOKIE)?.value
@@ -99,6 +114,7 @@ async function changeExistingCart(change: (cartId: string) => Promise<Cart>): Pr
     return { cart: await change(cartId) }
   } catch (err) {
     if (err instanceof CartNotFoundError) {
+      if (await shopify.getCart(cartId)) return { error: err.message }
       cookieStore.delete(CART_COOKIE)
       return { cart: null, error: EXPIRED_MESSAGE }
     }
@@ -108,16 +124,18 @@ async function changeExistingCart(change: (cartId: string) => Promise<Cart>): Pr
 }
 
 export async function updateCartItem(lineId: string, quantity: number): Promise<CartResult> {
+  if (!isId(lineId) || !isQuantity(quantity, 0)) return { error: INVALID_MESSAGE }
   if (isMock) return { cart: await writeMockLines(updateMockLine(await readMockLines(), lineId, quantity)) }
 
   return changeExistingCart(cartId =>
-    quantity <= 0
+    quantity === 0
       ? shopify.removeFromCart(cartId, [lineId])
       : shopify.updateCartItem(cartId, lineId, quantity),
   )
 }
 
 export async function removeFromCart(lineIds: string[]): Promise<CartResult> {
+  if (!Array.isArray(lineIds) || !lineIds.length || !lineIds.every(isId)) return { error: INVALID_MESSAGE }
   if (isMock) return { cart: await writeMockLines(removeMockLines(await readMockLines(), lineIds)) }
 
   return changeExistingCart(cartId => shopify.removeFromCart(cartId, lineIds))

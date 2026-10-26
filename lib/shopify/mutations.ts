@@ -31,10 +31,12 @@ const CART_FRAGMENT = `
   }
 `
 
-// Thrown when Shopify no longer recognises the cart id (expired or checked out).
+// Thrown when Shopify returns no cart. Usually the cart expired or was checked out, but
+// Shopify also omits the cart for some rejected inputs (e.g. an unknown variant), so
+// callers should confirm the cart is really gone before discarding it.
 export class CartNotFoundError extends Error {
-  constructor() {
-    super('Cart not found')
+  constructor(message = 'Cart not found') {
+    super(message)
     this.name = 'CartNotFoundError'
   }
 }
@@ -56,7 +58,7 @@ type CartPayload = {
 const PAYLOAD_FIELDS = 'cart { ...CartFields } userErrors { field message }'
 
 function unwrap(payload: CartPayload): Cart {
-  if (!payload.cart) throw new CartNotFoundError()
+  if (!payload.cart) throw new CartNotFoundError(payload.userErrors[0]?.message)
   if (payload.userErrors.length) throw new CartUserError(payload.userErrors[0].message)
   return reshapeCart(payload.cart)
 }
@@ -71,9 +73,16 @@ export async function getCart(cartId: string): Promise<Cart | null> {
   return data.cart ? reshapeCart(data.cart) : null
 }
 
-export async function createCart(): Promise<Cart> {
+// Creates the cart together with its first line, so a failed add never leaves an empty cart behind.
+export async function createCart(variantId: string, quantity: number): Promise<Cart> {
   const data = await shopifyFetch<{ cartCreate: CartPayload }>({
-    query: `mutation { cartCreate { ${PAYLOAD_FIELDS} } } ${CART_FRAGMENT}`,
+    query: `
+      mutation CreateCart($lines: [CartLineInput!]!) {
+        cartCreate(input: { lines: $lines }) { ${PAYLOAD_FIELDS} }
+      }
+      ${CART_FRAGMENT}
+    `,
+    variables: { lines: [{ merchandiseId: variantId, quantity }] },
     cache: 'no-store',
   })
   return unwrap(data.cartCreate)

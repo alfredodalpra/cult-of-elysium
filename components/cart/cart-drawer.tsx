@@ -50,14 +50,16 @@ export function CartDrawer() {
                   <span className="text-sm text-muted">Subtotal</span>
                   <span className="text-sm">{formatPrice(cart.cost.subtotalAmount)}</span>
                 </div>
-                {cart.checkoutUrl ? (
-                  <a
-                    href={cart.checkoutUrl}
-                    aria-disabled={isPending || undefined}
-                    className={buttonClasses('primary', 'w-full')}
-                  >
-                    {isPending ? 'Updating...' : 'Checkout'}
+                {cart.checkoutUrl && !isPending ? (
+                  <a href={cart.checkoutUrl} className={buttonClasses('primary', 'w-full')}>
+                    Checkout
                   </a>
+                ) : cart.checkoutUrl ? (
+                  // A real disabled button while quantities are updating, so checkout
+                  // can't be opened (even from the keyboard) with stale quantities.
+                  <Button variant="primary" className="w-full" disabled>
+                    Updating...
+                  </Button>
                 ) : (
                   <>
                     <Button variant="primary" className="w-full" disabled>

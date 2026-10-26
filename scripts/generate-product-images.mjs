@@ -105,12 +105,45 @@ ${COLLECTION_FRAMING}`,
 
 function readApiKey() {
   const env = existsSync('.env.local') ? readFileSync('.env.local', 'utf8') : ''
-  const key = process.env.GEMINI_API_KEY ?? env.match(/^GEMINI_API_KEY=(.+)$/m)?.[1]?.trim()
+  // Accept dotenv-style values: optional quotes, optional trailing comment.
+  const fromFile = env.match(/^GEMINI_API_KEY=\s*(?:"([^"]*)"|'([^']*)'|([^\s#]*))/m)
+  const key = process.env.GEMINI_API_KEY ?? fromFile?.slice(1).find(v => v !== undefined)
   if (!key) throw new Error('GEMINI_API_KEY is not set (add it to .env.local)')
   return key
 }
 
+const CONCURRENCY = 3
+const MAX_ATTEMPTS = 4
+
+// Runs `fn` over `items` with at most `limit` in flight.
+async function mapLimit(items, limit, fn) {
+  const queue = [...items]
+  await Promise.all(Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    while (queue.length) await fn(queue.shift())
+  }))
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
 async function generate(key, prompt, aspect, references) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await requestImage(key, prompt, aspect, references)
+    } catch (err) {
+      // Retry rate limits, overloads and the occasional empty (NO_IMAGE) response.
+      if (!err.retryable || attempt >= MAX_ATTEMPTS) throw err
+      const delay = 2000 * 2 ** (attempt - 1)
+      console.warn(`     retrying in ${delay / 1000}s (${err.message})`)
+      await sleep(delay)
+    }
+  }
+}
+
+function retryable(message) {
+  return Object.assign(new Error(message), { retryable: true })
+}
+
+async function requestImage(key, prompt, aspect, references) {
   const parts = [{ text: `${STYLE}
 
 ${prompt}` }]
@@ -125,10 +158,13 @@ ${prompt}` }]
     }),
   })
   const json = await res.json()
-  if (!res.ok) throw new Error(`${res.status} ${json.error?.message ?? JSON.stringify(json)}`)
+  if (!res.ok) {
+    const message = `${res.status} ${json.error?.message ?? JSON.stringify(json)}`
+    throw res.status === 429 || res.status >= 500 ? retryable(message) : new Error(message)
+  }
 
   const image = json.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData
-  if (!image) throw new Error(`no image returned (finishReason: ${json.candidates?.[0]?.finishReason ?? 'unknown'})`)
+  if (!image) throw retryable(`no image returned (finishReason: ${json.candidates?.[0]?.finishReason ?? 'unknown'})`)
   return Buffer.from(image.data, 'base64')
 }
 
@@ -142,20 +178,29 @@ async function main() {
   const byName = new Map(JOBS.map(j => [j.name, j]))
   const todo = JOBS.filter(j => (only ? j.keys.some(k => only.includes(k)) : force || !existsSync(j.file)))
 
+  const failed = new Set()
+
   // Jobs without references first, so their output can be used by the rest.
   for (const pass of [todo.filter(j => !j.refs.length), todo.filter(j => j.refs.length)]) {
-    await Promise.all(pass.map(async job => {
+    await mapLimit(pass, CONCURRENCY, async job => {
       try {
+        // Don't build on a reference that failed this run (an old file would no longer match)
+        // or that was never generated.
+        for (const ref of job.refs) {
+          if (failed.has(ref)) throw new Error(`reference ${ref} failed to generate`)
+          if (!existsSync(byName.get(ref).file)) throw new Error(`reference ${ref} is missing; generate it first (--only=${byName.get(ref).keys[0]})`)
+        }
         const references = await Promise.all(job.refs.map(r => sharp(byName.get(r).file).png().toBuffer()))
         const raw = await generate(key, job.prompt, job.aspect, references)
         const webp = await sharp(raw).resize(job.size.width, job.size.height, { fit: 'cover' }).webp({ quality: 82 }).toBuffer()
         writeFileSync(job.file, webp)
         console.log(`ok   ${path.relative(process.cwd(), job.file)} (${Math.round(webp.length / 1024)} KB)`)
       } catch (err) {
+        failed.add(job.name)
         console.error(`FAIL ${job.name}: ${err.message}`)
         process.exitCode = 1
       }
-    }))
+    })
   }
 }
 

@@ -23,7 +23,7 @@ export function parseMockLines(raw: string | undefined): MockLine[] {
 export function addMockLine(lines: MockLine[], variantId: string, quantity: number): MockLine[] {
   const existing = lines.find(l => l.variantId === variantId)
   if (!existing) return [...lines, { variantId, quantity }]
-  return lines.map(l => (l.variantId === variantId ? { ...l, quantity: l.quantity + quantity } : l))
+  return lines.map(l => (l.variantId === variantId ? { ...l, quantity: Math.min(l.quantity + quantity, 99) } : l))
 }
 
 export function updateMockLine(lines: MockLine[], variantId: string, quantity: number): MockLine[] {
