@@ -6,7 +6,7 @@ import { formatPrice } from '@/lib/utils'
 import type { CartItem } from '@/lib/shopify/types'
 
 export function CartLineItem({ item }: { item: CartItem }) {
-  const { update, remove } = useCart()
+  const { update, remove, isPending } = useCart()
   const image = item.merchandise.image ?? item.merchandise.product.featuredImage
 
   return (
@@ -25,14 +25,20 @@ export function CartLineItem({ item }: { item: CartItem }) {
         <div className="flex items-center gap-3 mt-2">
           <button
             onClick={() => item.quantity === 1 ? remove([item.id]) : update(item.id, item.quantity - 1)}
-            className="text-muted hover:text-bone text-sm cursor-pointer bg-transparent border-none"
+            // Quantities are sent as absolute values, so wait for each update to land
+            // before allowing the next one; otherwise quick repeat clicks would be lost.
+            disabled={isPending}
+            aria-label={`Decrease quantity of ${item.merchandise.product.title}`}
+            className="text-muted hover:text-bone text-sm cursor-pointer bg-transparent border-none disabled:opacity-40 disabled:cursor-wait"
           >
             -
           </button>
           <span className="text-xs w-4 text-center">{item.quantity}</span>
           <button
             onClick={() => update(item.id, item.quantity + 1)}
-            className="text-muted hover:text-bone text-sm cursor-pointer bg-transparent border-none"
+            disabled={isPending}
+            aria-label={`Increase quantity of ${item.merchandise.product.title}`}
+            className="text-muted hover:text-bone text-sm cursor-pointer bg-transparent border-none disabled:opacity-40 disabled:cursor-wait"
           >
             +
           </button>

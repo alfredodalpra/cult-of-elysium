@@ -3,11 +3,11 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useCart } from './cart-provider'
 import { CartLineItem } from './cart-line-item'
-import { Button } from '@/components/ui/button'
+import { Button, buttonClasses } from '@/components/ui/button'
 import { formatPrice } from '@/lib/utils'
 
 export function CartDrawer() {
-  const { cart, isOpen, close, isPending } = useCart()
+  const { cart, isOpen, close, isPending, error } = useCart()
 
   return (
     <AnimatePresence>
@@ -50,12 +50,28 @@ export function CartDrawer() {
                   <span className="text-sm text-muted">Subtotal</span>
                   <span className="text-sm">{formatPrice(cart.cost.subtotalAmount)}</span>
                 </div>
-                <a href={cart.checkoutUrl}>
-                  <Button variant="primary" className="w-full" disabled={isPending}>
+                {cart.checkoutUrl ? (
+                  <a
+                    href={cart.checkoutUrl}
+                    aria-disabled={isPending || undefined}
+                    className={buttonClasses('primary', 'w-full')}
+                  >
                     {isPending ? 'Updating...' : 'Checkout'}
-                  </Button>
-                </a>
+                  </a>
+                ) : (
+                  <>
+                    <Button variant="primary" className="w-full" disabled>
+                      {isPending ? 'Updating...' : 'Checkout'}
+                    </Button>
+                    <p className="text-[10px] text-muted text-center mt-3 tracking-wide">
+                      Demo store: checkout is disabled.
+                    </p>
+                  </>
+                )}
               </div>
+            )}
+            {error && (
+              <p role="alert" className="px-6 pb-6 text-xs text-center text-red-300">{error}</p>
             )}
           </motion.div>
         </>

@@ -8,13 +8,17 @@ export function Footer() {
           Cult of Elysium
         </div>
         <div className="flex gap-8">
-          {['Shop', 'Collections', 'About', 'Contact'].map((item) => (
+          {[
+            { label: 'Shop', href: '/store' },
+            { label: 'Collections', href: '/collections' },
+            { label: 'About', href: '/about' },
+          ].map(({ label, href }) => (
             <Link
-              key={item}
-              href={`/${item.toLowerCase()}`}
+              key={href}
+              href={href}
               className="text-[10px] tracking-[3px] uppercase text-muted hover:text-bone transition-colors"
             >
-              {item}
+              {label}
             </Link>
           ))}
         </div>

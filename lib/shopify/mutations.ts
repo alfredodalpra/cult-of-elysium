@@ -1,4 +1,5 @@
 import { shopifyFetch } from './client'
+import { reshapeCart, type ShopifyCart } from './reshape'
 import type { Cart } from './types'
 
 const CART_FRAGMENT = `
@@ -30,52 +31,92 @@ const CART_FRAGMENT = `
   }
 `
 
-export async function createCart(): Promise<Cart> {
-  const data = await shopifyFetch<{ cartCreate: { cart: Cart } }>({
-    query: `mutation { cartCreate { cart { ...CartFields } } } ${CART_FRAGMENT}`,
+// Thrown when Shopify no longer recognises the cart id (expired or checked out).
+export class CartNotFoundError extends Error {
+  constructor() {
+    super('Cart not found')
+    this.name = 'CartNotFoundError'
+  }
+}
+
+// Thrown when Shopify rejects a cart change, e.g. a sold-out variant or a quantity limit.
+// The message comes from Shopify's userErrors and is safe to show to the shopper.
+export class CartUserError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'CartUserError'
+  }
+}
+
+type CartPayload = {
+  cart: ShopifyCart | null
+  userErrors: { field: string[] | null; message: string }[]
+}
+
+const PAYLOAD_FIELDS = 'cart { ...CartFields } userErrors { field message }'
+
+function unwrap(payload: CartPayload): Cart {
+  if (!payload.cart) throw new CartNotFoundError()
+  if (payload.userErrors.length) throw new CartUserError(payload.userErrors[0].message)
+  return reshapeCart(payload.cart)
+}
+
+// Returns null when the cart no longer exists, e.g. it expired or was checked out.
+export async function getCart(cartId: string): Promise<Cart | null> {
+  const data = await shopifyFetch<{ cart: ShopifyCart | null }>({
+    query: `query GetCart($cartId: ID!) { cart(id: $cartId) { ...CartFields } } ${CART_FRAGMENT}`,
+    variables: { cartId },
     cache: 'no-store',
   })
-  return data.cartCreate.cart
+  return data.cart ? reshapeCart(data.cart) : null
+}
+
+export async function createCart(): Promise<Cart> {
+  const data = await shopifyFetch<{ cartCreate: CartPayload }>({
+    query: `mutation { cartCreate { ${PAYLOAD_FIELDS} } } ${CART_FRAGMENT}`,
+    cache: 'no-store',
+  })
+  return unwrap(data.cartCreate)
 }
 
 export async function addToCart(cartId: string, variantId: string, quantity = 1): Promise<Cart> {
-  const data = await shopifyFetch<{ cartLinesAdd: { cart: Cart } }>({
+  const data = await shopifyFetch<{ cartLinesAdd: CartPayload }>({
     query: `
       mutation AddToCart($cartId: ID!, $lines: [CartLineInput!]!) {
-        cartLinesAdd(cartId: $cartId, lines: $lines) { cart { ...CartFields } }
+        cartLinesAdd(cartId: $cartId, lines: $lines) { ${PAYLOAD_FIELDS} }
       }
       ${CART_FRAGMENT}
     `,
     variables: { cartId, lines: [{ merchandiseId: variantId, quantity }] },
     cache: 'no-store',
   })
-  return data.cartLinesAdd.cart
+  return unwrap(data.cartLinesAdd)
 }
 
 export async function updateCartItem(cartId: string, lineId: string, quantity: number): Promise<Cart> {
-  const data = await shopifyFetch<{ cartLinesUpdate: { cart: Cart } }>({
+  const data = await shopifyFetch<{ cartLinesUpdate: CartPayload }>({
     query: `
       mutation UpdateCart($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
-        cartLinesUpdate(cartId: $cartId, lines: $lines) { cart { ...CartFields } }
+        cartLinesUpdate(cartId: $cartId, lines: $lines) { ${PAYLOAD_FIELDS} }
       }
       ${CART_FRAGMENT}
     `,
     variables: { cartId, lines: [{ id: lineId, quantity }] },
     cache: 'no-store',
   })
-  return data.cartLinesUpdate.cart
+  return unwrap(data.cartLinesUpdate)
 }
 
 export async function removeFromCart(cartId: string, lineIds: string[]): Promise<Cart> {
-  const data = await shopifyFetch<{ cartLinesRemove: { cart: Cart } }>({
+  const data = await shopifyFetch<{ cartLinesRemove: CartPayload }>({
     query: `
       mutation RemoveFromCart($cartId: ID!, $lineIds: [ID!]!) {
-        cartLinesRemove(cartId: $cartId, lineIds: $lineIds) { cart { ...CartFields } }
+        cartLinesRemove(cartId: $cartId, lineIds: $lineIds) { ${PAYLOAD_FIELDS} }
       }
       ${CART_FRAGMENT}
     `,
     variables: { cartId, lineIds },
     cache: 'no-store',
   })
-  return data.cartLinesRemove.cart
+  return unwrap(data.cartLinesRemove)
 }
