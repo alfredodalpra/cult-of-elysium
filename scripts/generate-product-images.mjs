@@ -1,19 +1,20 @@
-// Generates the mock catalogue's product photos with Gemini image generation.
+// Generates the mock catalogue's product and collection photos with Gemini image generation.
 //
-//   node scripts/generate-product-images.mjs            # generate missing images
-//   node scripts/generate-product-images.mjs --force    # regenerate all
-//   node scripts/generate-product-images.mjs --only=1,13
+//   node scripts/generate-product-images.mjs                    # generate missing images
+//   node scripts/generate-product-images.mjs --force            # regenerate all
+//   node scripts/generate-product-images.mjs --only=1,13,the-star-vault
 //
-// Needs GEMINI_API_KEY in .env.local. Writes public/images/products/coe-<id>.webp,
-// matching the ids used by img() in lib/shopify/mock-data.ts.
+// Needs GEMINI_API_KEY in .env.local. Writes public/images/products/coe-<id>.webp
+// (the ids used by img() in lib/shopify/mock-data.ts) and
+// public/images/collections/<handle>.webp.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import sharp from 'sharp'
 
 const MODEL = 'gemini-3-pro-image'
-const OUT_DIR = path.join(process.cwd(), 'public/images/products')
-const SIZE = { width: 900, height: 1200 }
+const PRODUCT_DIR = path.join(process.cwd(), 'public/images/products')
+const COLLECTION_DIR = path.join(process.cwd(), 'public/images/collections')
 
 const STYLE = [
   'Luxury e-commerce product photograph for a gothic celestial jewelry brand.',
@@ -26,7 +27,7 @@ const STYLE = [
 
 // `ref` points at another image id whose output is sent along as a visual reference,
 // so colour variants and detail shots match the main photo.
-const IMAGES = [
+const PRODUCTS = [
   { id: 1, prompt: 'A heavy stainless steel chain bracelet laid in a loose oval: alternating bezel-set faceted rose-pink glass gemstones and small polished pyramid spike drops, like stained glass reassembled into a relic. Adjustable chain with a lobster clasp.' },
   { id: 11, ref: 1, prompt: 'The exact same bracelet as the reference image, same composition, camera angle and lighting, but every gemstone is a deep verdigris green (patinated copper green).' },
   { id: 12, ref: 1, prompt: 'The exact same bracelet as the reference image, same composition, camera angle and lighting, but every gemstone is a pale celestine lavender-blue.' },
@@ -53,6 +54,55 @@ const IMAGES = [
   { id: 81, ref: 8, prompt: 'An extreme macro close-up of the cuff bracelet in the reference image, filling the frame: only one end of the cuff is visible, showing the twisted steel strands and individual sharp thorns in fine detail, brushed metal texture visible.' },
 ]
 
+// Collection banners (16:9). The card overlays its title on the bottom-left, so that
+// area is kept dark and empty. `refs` are product ids whose main photos are passed in
+// so the banner shows the collection's actual pieces.
+const COLLECTIONS = [
+  {
+    handle: 'the-relic-collection',
+    refs: [1, 4, 7],
+    prompt: 'A wide still-life of the jewelry pieces shown in the reference images (the gem-and-spike bracelet, the black choker with obsidian drops, the black ring) arranged on black velvet beside a gothic stone altar ledge with a melted candle, like sacred relics.',
+  },
+  {
+    handle: 'the-star-vault',
+    refs: [2, 5, 8],
+    prompt: 'A wide still-life of the jewelry pieces shown in the reference images (the crown pendant necklace, the serpent earrings, the thorned cuff) on black velvet under a deep night sky full of stars and a faint violet nebula, like treasures in a celestial vault.',
+  },
+  {
+    handle: 'the-binding-rite',
+    refs: [3, 6],
+    prompt: 'A wide still-life of the jewelry pieces shown in the reference images (the three interlocking rings, the obsidian teardrop pendant) on black velvet, bound loosely with a thin dark silk ribbon, candlelit, intimate and solemn like a vow ceremony.',
+  },
+]
+
+const COLLECTION_FRAMING =
+  'Wide 16:9 banner: one single continuous photograph filling the entire frame edge to edge, ' +
+  'no borders, no side panels, no collage. Keep the pieces in the upper and right part of the frame; ' +
+  'the bottom-left third must be dark, plain and uncluttered because text is overlaid there.'
+
+// One flat list of jobs; `refs` name other jobs whose output is used as a reference.
+const JOBS = [
+  ...PRODUCTS.map(p => ({
+    name: `coe-${p.id}`,
+    keys: [String(p.id)],
+    prompt: p.prompt,
+    refs: p.ref ? [`coe-${p.ref}`] : [],
+    aspect: '3:4',
+    size: { width: 900, height: 1200 },
+    file: path.join(PRODUCT_DIR, `coe-${p.id}.webp`),
+  })),
+  ...COLLECTIONS.map(c => ({
+    name: c.handle,
+    keys: [c.handle],
+    prompt: `${c.prompt}
+${COLLECTION_FRAMING}`,
+    refs: c.refs.map(id => `coe-${id}`),
+    aspect: '16:9',
+    size: { width: 1600, height: 900 },
+    file: path.join(COLLECTION_DIR, `${c.handle}.webp`),
+  })),
+]
+
 function readApiKey() {
   const env = existsSync('.env.local') ? readFileSync('.env.local', 'utf8') : ''
   const key = process.env.GEMINI_API_KEY ?? env.match(/^GEMINI_API_KEY=(.+)$/m)?.[1]?.trim()
@@ -60,16 +110,18 @@ function readApiKey() {
   return key
 }
 
-async function generate(key, prompt, reference) {
-  const parts = [{ text: `${STYLE}\n\n${prompt}` }]
-  if (reference) parts.push({ inlineData: { mimeType: 'image/png', data: reference.toString('base64') } })
+async function generate(key, prompt, aspect, references) {
+  const parts = [{ text: `${STYLE}
+
+${prompt}` }]
+  for (const ref of references) parts.push({ inlineData: { mimeType: 'image/png', data: ref.toString('base64') } })
 
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
       contents: [{ parts }],
-      generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '3:4' } },
+      generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: aspect } },
     }),
   })
   const json = await res.json()
@@ -83,23 +135,24 @@ async function generate(key, prompt, reference) {
 async function main() {
   const key = readApiKey()
   const force = process.argv.includes('--force')
-  const only = process.argv.find(a => a.startsWith('--only='))?.slice(7).split(',').map(Number)
-  mkdirSync(OUT_DIR, { recursive: true })
+  const only = process.argv.find(a => a.startsWith('--only='))?.slice(7).split(',')
+  mkdirSync(PRODUCT_DIR, { recursive: true })
+  mkdirSync(COLLECTION_DIR, { recursive: true })
 
-  const outPath = id => path.join(OUT_DIR, `coe-${id}.webp`)
-  const todo = IMAGES.filter(img => (only ? only.includes(img.id) : force || !existsSync(outPath(img.id))))
+  const byName = new Map(JOBS.map(j => [j.name, j]))
+  const todo = JOBS.filter(j => (only ? j.keys.some(k => only.includes(k)) : force || !existsSync(j.file)))
 
-  // Main shots first, so their output can be used as references.
-  for (const pass of [todo.filter(i => !i.ref), todo.filter(i => i.ref)]) {
-    await Promise.all(pass.map(async img => {
+  // Jobs without references first, so their output can be used by the rest.
+  for (const pass of [todo.filter(j => !j.refs.length), todo.filter(j => j.refs.length)]) {
+    await Promise.all(pass.map(async job => {
       try {
-        const reference = img.ref ? await sharp(outPath(img.ref)).png().toBuffer() : undefined
-        const raw = await generate(key, img.prompt, reference)
-        const webp = await sharp(raw).resize(SIZE.width, SIZE.height, { fit: 'cover' }).webp({ quality: 82 }).toBuffer()
-        writeFileSync(outPath(img.id), webp)
-        console.log(`ok   coe-${img.id}.webp (${Math.round(webp.length / 1024)} KB)`)
+        const references = await Promise.all(job.refs.map(r => sharp(byName.get(r).file).png().toBuffer()))
+        const raw = await generate(key, job.prompt, job.aspect, references)
+        const webp = await sharp(raw).resize(job.size.width, job.size.height, { fit: 'cover' }).webp({ quality: 82 }).toBuffer()
+        writeFileSync(job.file, webp)
+        console.log(`ok   ${path.relative(process.cwd(), job.file)} (${Math.round(webp.length / 1024)} KB)`)
       } catch (err) {
-        console.error(`FAIL coe-${img.id}: ${err.message}`)
+        console.error(`FAIL ${job.name}: ${err.message}`)
         process.exitCode = 1
       }
     }))

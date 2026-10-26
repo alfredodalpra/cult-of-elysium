@@ -114,23 +114,30 @@ export const mockProducts: Product[] = [
   },
 ]
 
+const collectionImg = (handle: string, title: string) => ({
+  url: `/images/collections/${handle}.webp`,
+  altText: `${title} jewelry arranged on black velvet`,
+  width: 1600,
+  height: 900,
+})
+
 export const mockCollections: Collection[] = [
   {
     id: 'col-1', handle: 'the-relic-collection', title: 'The Relic Collection',
     description: 'Altarwear and gothic symbolism — heavy, glittering relics for sacred devotion.',
-    image: null,
+    image: collectionImg('the-relic-collection', 'The Relic Collection'),
     products: mockProducts.filter(p => p.collections.some(c => c.handle === 'the-relic-collection')),
   },
   {
     id: 'col-2', handle: 'the-star-vault', title: 'The Star Vault',
     description: 'Celestial offerings from the cosmos — astral crowns, lunar pendants, starborn rings.',
-    image: null,
+    image: collectionImg('the-star-vault', 'The Star Vault'),
     products: mockProducts.filter(p => p.collections.some(c => c.handle === 'the-star-vault')),
   },
   {
     id: 'col-3', handle: 'the-binding-rite', title: 'The Binding Rite',
     description: 'Vows forged in darkness — rings, bands, and bonds for the devoted.',
-    image: null,
+    image: collectionImg('the-binding-rite', 'The Binding Rite'),
     products: mockProducts.filter(p => p.collections.some(c => c.handle === 'the-binding-rite')),
   },
 ]
