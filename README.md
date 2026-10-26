@@ -16,6 +16,7 @@ A headless e-commerce storefront for a gothic jewelry brand, built with **Next.j
 - **Server-side cart:** cart mutations run as Server Actions, so the Storefront token never reaches the browser. The cart id lives in an `httpOnly` cookie, so the cart survives reloads and new tabs. If the stored cart expired or was checked out, a new one is created automatically.
 - **Demo mode:** without Shopify credentials, the whole store (including the cart) runs on built-in mock data. You can clone and run it, or deploy it, with zero configuration.
 - **Caching and revalidation:** catalog pages use ISR (`revalidate = 300`) and tag their fetches (`products`, `collections`). A Shopify webhook hits `/api/revalidate` to refresh them instantly, after verifying Shopify's HMAC-SHA256 signature with a constant-time comparison.
+- **Generated product photography:** the demo catalogue's photos were generated with Gemini (`gemini-3-pro-image`) by [`scripts/generate-product-images.mjs`](scripts/generate-product-images.mjs). Colour variants and close-ups pass the main shot back as a reference image so each product's photos match.
 - **Custom visuals:** the homepage hero is a hand-written `<canvas>` animation (painted nebula, drifting orbs, twinkling stars), with Framer Motion for page and cart-drawer transitions.
 
 ## Tech stack
@@ -79,6 +80,7 @@ To get instant catalog updates, create Shopify webhooks for product and collecti
 | `npm run build` | Production build |
 | `npm run start` | Serve the production build |
 | `npm run lint` | ESLint |
+| `node scripts/generate-product-images.mjs` | Regenerate demo product photos (needs `GEMINI_API_KEY` in `.env.local`) |
 
 ## Deploying
 

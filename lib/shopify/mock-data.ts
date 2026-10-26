@@ -1,10 +1,11 @@
 import type { Product, Collection } from './types'
 
+// Product photos generated with scripts/generate-product-images.mjs
 const img = (id: number) => ({
-  url: `https://picsum.photos/seed/coe${id}/600/800`,
+  url: `/images/products/coe-${id}.webp`,
   altText: null,
-  width: 600,
-  height: 800,
+  width: 900,
+  height: 1200,
 })
 
 const money = (amount: string) => ({ amount, currencyCode: 'EUR' })
