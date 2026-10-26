@@ -54,21 +54,17 @@ export function CartDrawer() {
                   <a href={cart.checkoutUrl} className={buttonClasses('primary', 'w-full')}>
                     Checkout
                   </a>
-                ) : cart.checkoutUrl ? (
-                  // A real disabled button while quantities are updating, so checkout
-                  // can't be opened (even from the keyboard) with stale quantities.
-                  <Button variant="primary" className="w-full" disabled>
-                    Updating...
-                  </Button>
                 ) : (
-                  <>
-                    <Button variant="primary" className="w-full" disabled>
-                      {isPending ? 'Updating...' : 'Checkout'}
-                    </Button>
-                    <p className="text-[10px] text-muted text-center mt-3 tracking-wide">
-                      Demo store: checkout is disabled.
-                    </p>
-                  </>
+                  // A real disabled button while updating, so checkout can't be opened
+                  // (even from the keyboard) with stale quantities.
+                  <Button variant="primary" className="w-full" disabled>
+                    {isPending ? 'Updating...' : 'Checkout'}
+                  </Button>
+                )}
+                {!cart.checkoutUrl && (
+                  <p className="text-[10px] text-muted text-center mt-3 tracking-wide">
+                    Demo store: checkout is disabled.
+                  </p>
                 )}
               </div>
             )}

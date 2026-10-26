@@ -35,18 +35,27 @@ const CART_FRAGMENT = `
 // Shopify also omits the cart for some rejected inputs (e.g. an unknown variant), so
 // callers should confirm the cart is really gone before discarding it.
 export class CartNotFoundError extends Error {
-  constructor(message = 'Cart not found') {
-    super(message)
+  // Shopify's explanation, when it gave one (safe to show to the shopper).
+  readonly shopifyMessage?: string
+
+  constructor(shopifyMessage?: string) {
+    super(shopifyMessage ?? 'Cart not found')
     this.name = 'CartNotFoundError'
+    this.shopifyMessage = shopifyMessage
   }
 }
 
-// Thrown when Shopify rejects a cart change, e.g. a sold-out variant or a quantity limit.
-// The message comes from Shopify's userErrors and is safe to show to the shopper.
+// Thrown when Shopify rejects (part of) a cart change, e.g. a sold-out variant or a quantity
+// limit. The message comes from Shopify's userErrors and is safe to show to the shopper.
+// Shopify may still return the resulting cart (e.g. with a quantity adjusted to stock);
+// it is kept on `cart` so callers don't lose it.
 export class CartUserError extends Error {
-  constructor(message: string) {
+  readonly cart?: Cart
+
+  constructor(message: string, cart?: Cart) {
     super(message)
     this.name = 'CartUserError'
+    this.cart = cart
   }
 }
 
@@ -59,8 +68,9 @@ const PAYLOAD_FIELDS = 'cart { ...CartFields } userErrors { field message }'
 
 function unwrap(payload: CartPayload): Cart {
   if (!payload.cart) throw new CartNotFoundError(payload.userErrors[0]?.message)
-  if (payload.userErrors.length) throw new CartUserError(payload.userErrors[0].message)
-  return reshapeCart(payload.cart)
+  const cart = reshapeCart(payload.cart)
+  if (payload.userErrors.length) throw new CartUserError(payload.userErrors[0].message, cart)
+  return cart
 }
 
 // Returns null when the cart no longer exists, e.g. it expired or was checked out.

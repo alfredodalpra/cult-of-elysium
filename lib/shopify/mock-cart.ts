@@ -1,3 +1,4 @@
+import { MAX_QUANTITY } from './constants'
 import { mockProducts } from './mock-data'
 import type { Cart, CartItem } from './types'
 
@@ -23,7 +24,7 @@ export function parseMockLines(raw: string | undefined): MockLine[] {
 export function addMockLine(lines: MockLine[], variantId: string, quantity: number): MockLine[] {
   const existing = lines.find(l => l.variantId === variantId)
   if (!existing) return [...lines, { variantId, quantity }]
-  return lines.map(l => (l.variantId === variantId ? { ...l, quantity: Math.min(l.quantity + quantity, 99) } : l))
+  return lines.map(l => (l.variantId === variantId ? { ...l, quantity: Math.min(l.quantity + quantity, MAX_QUANTITY) } : l))
 }
 
 export function updateMockLine(lines: MockLine[], variantId: string, quantity: number): MockLine[] {

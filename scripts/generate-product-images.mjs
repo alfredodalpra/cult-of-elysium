@@ -106,8 +106,9 @@ ${COLLECTION_FRAMING}`,
 function readApiKey() {
   const env = existsSync('.env.local') ? readFileSync('.env.local', 'utf8') : ''
   // Accept dotenv-style values: optional quotes, optional trailing comment.
-  const fromFile = env.match(/^GEMINI_API_KEY=\s*(?:"([^"]*)"|'([^']*)'|([^\s#]*))/m)
-  const key = process.env.GEMINI_API_KEY ?? fromFile?.slice(1).find(v => v !== undefined)
+  const fromFile = env.match(/^GEMINI_API_KEY=[ \t]*(?:"([^"]*)"|'([^']*)'|([^\s#]*))/m)
+  // `|| undefined` so an empty `GEMINI_API_KEY=` counts as unset.
+  const key = process.env.GEMINI_API_KEY || fromFile?.slice(1).find(v => v !== undefined) || undefined
   if (!key) throw new Error('GEMINI_API_KEY is not set (add it to .env.local)')
   return key
 }
@@ -157,11 +158,19 @@ ${prompt}` }]
       generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: aspect } },
     }),
   })
-  const json = await res.json()
+  // Overloaded gateways can answer with an HTML page, so don't assume the body is JSON.
+  const body = await res.text()
+  let json
+  try {
+    json = JSON.parse(body)
+  } catch {
+    json = undefined
+  }
   if (!res.ok) {
-    const message = `${res.status} ${json.error?.message ?? JSON.stringify(json)}`
+    const message = `${res.status} ${json?.error?.message ?? body.slice(0, 200)}`
     throw res.status === 429 || res.status >= 500 ? retryable(message) : new Error(message)
   }
+  if (!json) throw retryable(`unparseable response: ${body.slice(0, 200)}`)
 
   const image = json.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData
   if (!image) throw retryable(`no image returned (finishReason: ${json.candidates?.[0]?.finishReason ?? 'unknown'})`)

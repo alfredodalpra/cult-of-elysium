@@ -5,7 +5,7 @@ import type { Collection } from '@/lib/shopify/types'
 export function CollectionCard({ collection }: { collection: Collection }) {
   return (
     <Link href={`/collections/${collection.handle}`} className="group block">
-      <div className="aspect-[16/9] relative overflow-hidden rounded-lg border border-white/[0.06] group-hover:border-ritual-violet/30 transition-all duration-500">
+      <div className="aspect-[4/3] sm:aspect-[16/9] relative overflow-hidden rounded-lg border border-white/[0.06] group-hover:border-ritual-violet/30 transition-all duration-500">
         {collection.image ? (
           <Image src={collection.image.url} alt={collection.image.altText ?? collection.title} fill className="object-cover group-hover:scale-105 transition-transform duration-700" sizes="(max-width: 768px) 100vw, 33vw" />
         ) : (

@@ -2,6 +2,7 @@
 
 import { cookies } from 'next/headers'
 import { isMock } from './config'
+import { MAX_QUANTITY } from './constants'
 import * as shopify from './mutations'
 import { CartNotFoundError, CartUserError } from './mutations'
 import {
@@ -30,7 +31,7 @@ export type CartResult = {
 
 const EXPIRED_MESSAGE = 'Your cart expired, so it has been cleared. Please add your items again.'
 const INVALID_MESSAGE = 'That cart update is not valid.'
-const MAX_QUANTITY = 99
+const REJECTED_MESSAGE = "That item couldn't be updated. Please try again."
 
 // Server Actions are public endpoints, so their arguments are untrusted input.
 function isQuantity(value: unknown, min: number): value is number {
@@ -75,6 +76,23 @@ export async function getCart(): Promise<Cart | null> {
   return cart
 }
 
+// Shopify returned no cart. If the cart still exists, Shopify rejected the change itself
+// (e.g. an unknown variant or line) rather than the cart having expired.
+async function rejectedOrExpired(cartId: string): Promise<'rejected' | 'expired'> {
+  return (await shopify.getCart(cartId)) ? 'rejected' : 'expired'
+}
+
+function rejectedResult(err: CartNotFoundError): CartResult {
+  return { error: err.shopifyMessage ?? REJECTED_MESSAGE }
+}
+
+// Repeated adds can push a Shopify line past the limit; bring it back down.
+async function capLine(cartId: string, cart: Cart, variantId: string): Promise<Cart> {
+  const line = cart.lines.find(l => l.merchandise.id === variantId)
+  if (!line || line.quantity <= MAX_QUANTITY) return cart
+  return shopify.updateCartItem(cartId, line.id, MAX_QUANTITY)
+}
+
 export async function addToCart(variantId: string, quantity = 1): Promise<CartResult> {
   if (!isId(variantId) || !isQuantity(quantity, 1)) return { error: INVALID_MESSAGE }
   if (isMock) return { cart: await writeMockLines(addMockLine(await readMockLines(), variantId, quantity)) }
@@ -85,21 +103,27 @@ export async function addToCart(variantId: string, quantity = 1): Promise<CartRe
   try {
     if (cartId) {
       try {
-        return { cart: await shopify.addToCart(cartId, variantId, quantity) }
+        return { cart: await capLine(cartId, await shopify.addToCart(cartId, variantId, quantity), variantId) }
       } catch (err) {
         if (!(err instanceof CartNotFoundError)) throw err
-        // Shopify returned no cart. If the cart still exists it rejected the item instead.
-        if (await shopify.getCart(cartId)) return { error: err.message }
-        // Otherwise the stored cart expired or was checked out: start a new one below.
+        if ((await rejectedOrExpired(cartId)) === 'rejected') return rejectedResult(err)
+        // The stored cart expired or was checked out: start a new one below.
       }
     }
 
-    // Only point the cookie at the new cart once it exists with the item in it.
-    const cart = await shopify.createCart(variantId, quantity)
-    cookieStore.set(CART_COOKIE, cart.id, cookieOptions)
-    return { cart }
+    // The new cart is created with the item in it. Only point the cookie at it once it
+    // exists, including when Shopify created it but adjusted the line (CartUserError.cart).
+    try {
+      const cart = await shopify.createCart(variantId, quantity)
+      cookieStore.set(CART_COOKIE, cart.id, cookieOptions)
+      return { cart }
+    } catch (err) {
+      if (err instanceof CartUserError && err.cart) cookieStore.set(CART_COOKIE, err.cart.id, cookieOptions)
+      throw err
+    }
   } catch (err) {
-    if (err instanceof CartUserError || err instanceof CartNotFoundError) return { error: err.message }
+    if (err instanceof CartUserError) return { cart: err.cart, error: err.message }
+    if (err instanceof CartNotFoundError) return rejectedResult(err)
     throw err
   }
 }
@@ -114,11 +138,11 @@ async function changeExistingCart(change: (cartId: string) => Promise<Cart>): Pr
     return { cart: await change(cartId) }
   } catch (err) {
     if (err instanceof CartNotFoundError) {
-      if (await shopify.getCart(cartId)) return { error: err.message }
+      if ((await rejectedOrExpired(cartId)) === 'rejected') return rejectedResult(err)
       cookieStore.delete(CART_COOKIE)
       return { cart: null, error: EXPIRED_MESSAGE }
     }
-    if (err instanceof CartUserError) return { error: err.message }
+    if (err instanceof CartUserError) return { cart: err.cart, error: err.message }
     throw err
   }
 }

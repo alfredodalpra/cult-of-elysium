@@ -2,8 +2,12 @@ import { Navbar } from '@/components/layout/navbar'
 import { Footer } from '@/components/layout/footer'
 import { CartDrawer } from '@/components/cart/cart-drawer'
 import { StarField } from '@/components/ui/star-field'
+import { getCollections } from '@/lib/shopify/queries'
 
-export default function StoreLayout({ children }: { children: React.ReactNode }) {
+export default async function StoreLayout({ children }: { children: React.ReactNode }) {
+  // The navbar's Shop menu lists the real collections, so it can't link to ones that don't exist.
+  const collections = (await getCollections()).map(({ handle, title }) => ({ handle, title }))
+
   return (
     <div className="relative min-h-screen">
       <div className="fixed inset-0 z-0">
@@ -11,7 +15,7 @@ export default function StoreLayout({ children }: { children: React.ReactNode })
         <StarField />
       </div>
       <div className="relative z-10">
-        <Navbar />
+        <Navbar collections={collections} />
         <CartDrawer />
         <main className="pt-20 min-h-screen">
           {children}
